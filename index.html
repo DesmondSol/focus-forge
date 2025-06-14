@@ -1,0 +1,81 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Focus Forge</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!--
+  To add Amharic font support, uncomment the line below and add 'Noto Sans Ethiopic' to your Tailwind CSS font family.
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@400;700&display=swap" rel="stylesheet">
+  -->
+  <script>
+    tailwind.config = {
+      darkMode: 'class', // Enable class-based dark mode
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              light: '#3b82f6', // blue-500
+              DEFAULT: '#2563eb', // blue-600
+              dark: '#1d4ed8'  // blue-700
+            },
+            secondary: {
+              light: '#f0f0f0',
+              DEFAULT: '#e5e5e5',
+              dark: '#d4d4d4'
+            },
+            accent: {
+              DEFAULT: '#10b981', // emerald-500
+              hover: '#059669'  // emerald-600
+            },
+            // Backgrounds
+            bglight: {
+              DEFAULT: '#ffffff', // white
+              surface: '#f9fafb', // gray-50
+              muted: '#f3f4f6' // gray-100
+            },
+            bgdark: {
+              DEFAULT: '#111827', // gray-900
+              surface: '#1f2937', // gray-800
+              muted: '#374151'  // gray-700
+            },
+            // Text
+            textlight: {
+              DEFAULT: '#111827', // gray-900
+              muted: '#6b7280' // gray-500
+            },
+            textdark: {
+              DEFAULT: '#f9fafb', // gray-50
+              muted: '#9ca3af' // gray-400
+            }
+          },
+          fontFamily: {
+            // Add 'Noto Sans Ethiopic' here if you uncomment the link above, e.g.:
+            // sans: ['ui-sans-serif', 'system-ui', 'Noto Sans Ethiopic', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.1.0/",
+    "react": "https://esm.sh/react@^19.1.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.5.1",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.6.2",
+    "date-fns": "https://esm.sh/date-fns@^4.1.0",
+    "date-fns/": "https://esm.sh/date-fns@^4.1.0/"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-bglight dark:bg-bgdark text-textlight dark:text-textdark transition-colors duration-300">
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
