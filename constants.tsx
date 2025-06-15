@@ -3,10 +3,13 @@ import React from 'react';
 import { FocusForgeTemplateData } from './types'; // Ensure this type is imported
 
 export const APP_NAME_TRANSLATION_KEY = "appName"; // Used for retrieving translated app name
-export const POMODORO_WORK_DURATION_MINUTES = 25;
-export const POMODORO_SHORT_BREAK_DURATION_MINUTES = 5;
+export const POMODORO_WORK_DURATION_MINUTES = 25; 
+export const POMODORO_SHORT_BREAK_DURATION_MINUTES = 5; 
 export const POMODORO_LONG_BREAK_DURATION_MINUTES = 15;
 export const POMODOROS_BEFORE_LONG_BREAK = 4;
+
+// BACKGROUND_MUSIC_URL is removed as users will now upload their own music.
+export const TIMER_END_SOUND_URL = 'https://www.soundjay.com/buttons/sounds/button-09.mp3'; // Placeholder, use royalty-free
 
 export const GEMINI_API_KEY_ERROR_MESSAGE = "Gemini API key not configured. AI features will be limited.";
 export const GEMINI_GENERAL_ERROR_MESSAGE = "Could not retrieve data from AI. Please try again later.";
@@ -14,7 +17,7 @@ export const DEFAULT_MOTIVATIONAL_QUOTE_KEY = "defaultMotivationalQuote"; // Key
 
 // LocalStorage Keys
 export const STORAGE_KEYS = {
-  DAILY_TASK: `FocusForge_dailyTask`, // App name prefix removed as it's now dynamic
+  DAILY_TASK: `FocusForge_dailyTask`, 
   MOOD_LOGS: `FocusForge_moodLogs`,
   JOURNAL_ENTRIES: `FocusForge_journalEntries`,
   WEEKLY_MISSION: `FocusForge_weeklyMission`,
@@ -26,12 +29,17 @@ export const STORAGE_KEYS = {
   THEME: `FocusForge_theme`,
   POMODORO_SETTINGS: `FocusForge_pomodoroSettings`,
   NOTIFICATIONS: `FocusForge_notifications`,
-  LANGUAGE: `FocusForge_language`, // New key for language
-  ONBOARDING_COMPLETED: `FocusForge_onboardingCompleted` // New key for onboarding
+  LANGUAGE: `FocusForge_language`, 
+  ONBOARDING_COMPLETED: `FocusForge_onboardingCompleted`,
+  AI_CHAT_MESSAGES_COACH: `FocusForge_aiChatMessages_Coach`,
+  AI_CHAT_MESSAGES_TEMPLATE_CREATOR: `FocusForge_aiChatMessages_TemplateCreator`
 };
 
 // SVG Icons (Heroicons & custom)
-// Icons remain the same, so they are not repeated here for brevity, but would be in the actual file.
+// The Icons object is correctly exported. If an error mentions this module
+// not providing 'Icons' via a path like '@/constants', ensure that path
+// correctly resolves to this file and that there are no external configuration
+// or caching issues. The provided application files use './constants'.
 export const Icons = {
   Sun: (props: React.SVGProps<SVGSVGElement>): JSX.Element => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
@@ -129,8 +137,8 @@ export const Icons = {
     </svg>
   ),
   Sparkles: (props: React.SVGProps<SVGSVGElement>): JSX.Element => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L1.875 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09l2.846.813-.813 2.846a4.5 4.5 0 00-3.09 3.09zM18.25 7.5l.813-2.846a.75.75 0 00-1.06-1.06L15.156 5.25l-.813 2.846a.75.75 0 001.06 1.06L18.25 7.5zM18.25 16.5l.813-2.846a.75.75 0 00-1.06-1.06L15.156 14.25l-.813 2.846a.75.75 0 001.06 1.06L18.25 16.5z" />
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" {...props}>
+      <path d="M7.657 6.247c.11-.33.576-.33.686 0l.645 1.937a2.89 2.89 0 0 0 1.829 1.828l1.936.645c.33.11.33.576 0 .686l-1.937.645a2.89 2.89 0 0 0-1.828 1.829l-.645 1.936a.361.361 0 0 1-.686 0l-.645-1.937a2.89 2.89 0 0 0-1.828-1.828l-1.937-.645a.361.361 0 0 1 0-.686l1.937-.645a2.89 2.89 0 0 0 1.828-1.828zM3.794 1.148a.217.217 0 0 1 .412 0l.387 1.162c.173.518.579.924 1.097 1.097l1.162.387a.217.217 0 0 1 0 .412l-1.162.387A1.73 1.73 0 0 0 4.593 5.69l-.387 1.162a.217.217 0 0 1-.412 0L3.407 5.69A1.73 1.73 0 0 0 2.31 4.593l-1.162-.387a.217.217 0 0 1 0-.412l1.162-.387A1.73 1.73 0 0 0 3.407 2.31zM10.863.099a.145.145 0 0 1 .274 0l.258.774c.115.346.386.617.732.732l.774.258a.145.145 0 0 1 0 .274l-.774.258a1.16 1.16 0 0 0-.732.732l-.258.774a.145.145 0 0 1-.274 0l-.258-.774a1.16 1.16 0 0 0-.732-.732L9.1 2.137a.145.145 0 0 1 0-.274l.774-.258c.346-.115.617-.386.732-.732z"/>
     </svg>
   ),
   UserCircle: (props: React.SVGProps<SVGSVGElement>): JSX.Element => (
@@ -168,24 +176,44 @@ export const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A11.978 11.978 0 0112 13.5c-2.998 0-5.74-1.1-7.843-2.918m0 0A8.959 8.959 0 013 12c0-.778.099-1.533.284-2.253m0 0A11.978 11.978 0 0112 10.5c2.998 0 5.74 1.1 7.843 2.918" />
     </svg>
   ),
+  SpeakerWave: (props: React.SVGProps<SVGSVGElement>): JSX.Element => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+    </svg>
+  ),
+  SpeakerXMark: (props: React.SVGProps<SVGSVGElement>): JSX.Element => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 9.75L19.5 12m0 0L21.75 14.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+    </svg>
+  ),
+  MusicNote: (props: React.SVGProps<SVGSVGElement>): JSX.Element => ( 
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.073 1.935l-3.427 1.715a2.25 2.25 0 01-2.43 0l-3.427-1.715A2.25 2.25 0 016 19.303V15.55A2.25 2.25 0 017.072 13.6L9 9zM9 9V6.75A2.25 2.25 0 0111.25 4.5h2.34a2.25 2.25 0 012.164 1.59L17.5 9" />
+    </svg>
+  ),
+  Template: (props: React.SVGProps<SVGSVGElement>): JSX.Element => ( // Icon for Template Creator
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+    </svg>
+  ),
 };
 
 // --- Entrepreneur Starter Template Data ---
 export const ENTREPRENEUR_STARTER_TEMPLATE_DATA: FocusForgeTemplateData = {
   weeklyMission: {
     id: 'starter_mission_entrepreneur',
-    text: "This week: Achieve breakthrough growth OR learn critical lessons. Execute relentlessly.", // This can be a translation key
-    deadline: "" // Will be set dynamically upon application
+    text: "This week: Achieve breakthrough growth OR learn critical lessons. Execute relentlessly.", 
+    deadline: "" 
   },
   habits: [
-    { id: 'sth_deepwork', name: "Morning Deep Work (90 mins)", streak: 0, lastCompletedDate: null, consequence: "No social media until completed.", targetDays: [1, 2, 3, 4, 5] }, // name & consequence can be keys
+    { id: 'sth_deepwork', name: "Morning Deep Work (90 mins)", streak: 0, lastCompletedDate: null, consequence: "No social media until completed.", targetDays: [1, 2, 3, 4, 5] }, 
     { id: 'sth_exercise', name: "Daily Physical Exercise (30 mins)", streak: 0, lastCompletedDate: null, consequence: "10 push-ups penalty.", targetDays: [0, 1, 2, 3, 4, 5, 6] },
     { id: 'sth_learn', name: "Read/Learn Industry Material (30 mins)", streak: 0, lastCompletedDate: null, consequence: "No entertainment TV/Movies.", targetDays: [1, 2, 3, 4, 5] },
     { id: 'sth_network', name: "Networking/Outreach (3 Active Contacts)", streak: 0, lastCompletedDate: null, consequence: "Skip one leisure activity.", targetDays: [1, 3, 5] },
     { id: 'sth_reviewplan', name: "Evening Review & Next Day Plan (15 mins)", streak: 0, lastCompletedDate: null, consequence: "Delayed start tomorrow.", targetDays: [0, 1, 2, 3, 4, 5, 6] },
   ],
   scheduledGoals: [ 
-    { id: 'stsg_metrics', title: "Define/Review Key Weekly Metrics", date: "DYNAMIC_MONDAY", time: "09:00", isGoal: true, completed: false }, // title can be a key
+    { id: 'stsg_metrics', title: "Define/Review Key Weekly Metrics", date: "DYNAMIC_MONDAY", time: "09:00", isGoal: true, completed: false }, 
     { id: 'stsg_interactions', title: "Min. 3 Customer/Stakeholder Interactions", date: "DYNAMIC_TUESDAY", time: "14:00", isGoal: false, completed: false },
     { id: 'stsg_problemsolve', title: "Dedicated Problem-Solving Block (Major Obstacle)", date: "DYNAMIC_WEDNESDAY", time: "10:00", isGoal: true, completed: false },
     { id: 'stsg_followup', title: "Follow-up & Relationship Building", date: "DYNAMIC_THURSDAY", time: "15:00", isGoal: false, completed: false },
@@ -195,8 +223,8 @@ export const ENTREPRENEUR_STARTER_TEMPLATE_DATA: FocusForgeTemplateData = {
     {
       id: 'stwp_mainplan',
       weekStartDate: "DYNAMIC_MONDAY",
-      mainGoal: "Execute relentlessly on top 1-2 priorities & validate key assumptions for breakthrough progress.", // can be a key
-      majorTasks: [ // text can be keys
+      mainGoal: "Execute relentlessly on top 1-2 priorities & validate key assumptions for breakthrough progress.", 
+      majorTasks: [ 
         { id: "stwpt_mit", text: "Define and publicly commit to this week's #1 Most Important Task (MIT).", completed: false },
         { id: "stwpt_deepblock", text: "Time-block and defend at least 3 deep work sessions for the MIT.", completed: false },
         { id: "stwpt_feedback", text: "Actively seek feedback on progress/direction by mid-week.", completed: false },
@@ -205,7 +233,3 @@ export const ENTREPRENEUR_STARTER_TEMPLATE_DATA: FocusForgeTemplateData = {
     },
   ],
 };
-// Note: For full translation of starter template, the 'text', 'name', 'consequence', 'title', 'mainGoal' 
-// fields within ENTREPRENEUR_STARTER_TEMPLATE_DATA would also need to be translation keys, 
-// and the ImportExportPage logic would need to use the `t` function when applying them.
-// For brevity here, I've left them as English strings but noted where keys would apply.

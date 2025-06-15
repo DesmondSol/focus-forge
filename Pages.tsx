@@ -179,18 +179,31 @@ export const DashboardPage: React.FC = () => {
   const [showMoodModal, setShowMoodModal] = useState(false);
   const [currentMood, setCurrentMood] = useState(3);
   const [currentEnergy, setCurrentEnergy] = useState(3);
+  const [breakInvitationMessage, setBreakInvitationMessage] = useState<string | null>(null);
   
-  const pomodoro = usePomodoro((mode, completedPomodoros) => {
-    console.log(`${mode} session ended! Pomodoros completed: ${completedPomodoros}`);
+  const pomodoro = usePomodoro((endedMode, newMode, completedPomodoros) => {
+    // Log the completed session
+    const duration = endedMode === PomodoroMode.Work ? pomodoro.settings.workDuration 
+                   : endedMode === PomodoroMode.ShortBreak ? pomodoro.settings.shortBreakDuration 
+                   : pomodoro.settings.longBreakDuration;
     const newLog: TimeLog = {
       id: Date.now().toString(),
-      startTime: Date.now() - (mode === PomodoroMode.Work ? pomodoro.settings.workDuration * 60000 : (mode === PomodoroMode.ShortBreak ? pomodoro.settings.shortBreakDuration * 60000 : pomodoro.settings.longBreakDuration * 60000) ),
+      startTime: Date.now() - (duration * 60000),
       endTime: Date.now(),
-      activity: mode === PomodoroMode.Work ? `${t('timeTrackerActivityTypeFocus')} #${completedPomodoros}` : `${t(mode === PomodoroMode.ShortBreak ? 'pomodoroModeShortBreak' : 'pomodoroModeLongBreak')}`,
-      type: mode === PomodoroMode.Work ? 'focus' : 'break',
+      activity: endedMode === PomodoroMode.Work 
+                  ? `${t('timeTrackerActivityTypeFocus')} #${completedPomodoros}` 
+                  : `${t(endedMode === PomodoroMode.ShortBreak ? 'pomodoroModeShortBreak' : 'pomodoroModeLongBreak')}`,
+      type: endedMode === PomodoroMode.Work ? 'focus' : 'break',
       date: getTodayDateString(),
     };
     saveData<TimeLog[]>(STORAGE_KEYS.TIME_LOGS, [...loadData<TimeLog[]>(STORAGE_KEYS.TIME_LOGS, []), newLog]);
+
+    // Show break invitation if a work session just ended
+    if (endedMode === PomodoroMode.Work) {
+        const breakTypeTranslationKey = newMode === PomodoroMode.ShortBreak ? 'pomodoroModeShortBreak' : 'pomodoroModeLongBreak';
+        setBreakInvitationMessage(t('dashboardBreakInvitation', { breakType: t(breakTypeTranslationKey) }));
+        setTimeout(() => setBreakInvitationMessage(null), 7000); // Auto-hide after 7 seconds
+    }
   });
 
   useEffect(() => {
@@ -313,7 +326,7 @@ export const DashboardPage: React.FC = () => {
         </Card>
 
         <Card title={t('dashboardFocusTimerTitle')} icon={<Icons.Clock />} className="lg:col-span-2">
-          <PomodoroControls pomodoro={pomodoro} />
+          <PomodoroControls pomodoro={pomodoro} breakInvitationMessage={breakInvitationMessage} />
         </Card>
 
         <Card title={t('dashboardMoodEnergyTitle')} icon={<Icons.Star />}>

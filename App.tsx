@@ -1,48 +1,139 @@
 
-import React, { useState } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useTheme, useLocalStorage } from './hooks';
-import { Sidebar, MobileHeader, FloatingActionButtons, HelpModal, AiChatModal } from './uiElements';
+import { Sidebar, MobileHeader, FloatingActionButtons, HelpModal, AiChatModal, AiFeatureSelectionModal } from './uiElements';
 import { DashboardPage, CalendarPage, NotebookPage, TimeTrackerPage, ReviewPage, PlansPage, DisciplineBoardPage, ImportExportPage, OnboardingPage } from './Pages';
 import { STORAGE_KEYS, APP_NAME_TRANSLATION_KEY } from './constants';
-import { ChatMessage, Language } from './types';
-import { getAiChatResponse, loadData, saveData } from './services';
-import { LanguageProvider, useLanguageContext } from './contexts'; // Import LanguageProvider
+import { ChatMessage, Language, AiFeatureMode, FocusForgeTemplateData, Habit, WeeklyMission, WeeklyPlan, ScheduledGoal } from './types';
+import { getAiChatResponse, generateTemplateDataFromConversation, loadData, saveData } from './services';
+import { LanguageProvider, useLanguageContext } from './contexts'; 
+import { format, addDays } from 'date-fns';
+import startOfWeek from 'date-fns/startOfWeek';
 
 const MainApp: React.FC = () => {
   const [theme, toggleTheme] = useTheme();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { language, t, setLanguage } = useLanguageContext(); // Consume language context
+  const { language, t, setLanguage } = useLanguageContext();
+  const navigate = useNavigate();
 
-  // States for Modals
+  // Modals State
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isAiChatModalOpen, setIsAiChatModalOpen] = useState(false);
+  const [isAiFeatureSelectionModalOpen, setIsAiFeatureSelectionModalOpen] = useState(false);
   
-  const [chatMessages, setChatMessages] = useLocalStorage<ChatMessage[]>(`${STORAGE_KEYS.NOTIFICATIONS}_aiChat`, []);
+  const [currentAiMode, setCurrentAiMode] = useState<AiFeatureMode>(AiFeatureMode.Coach);
+  
+  const [coachChatMessages, setCoachChatMessages] = useLocalStorage<ChatMessage[]>(STORAGE_KEYS.AI_CHAT_MESSAGES_COACH, []);
+  const [templateCreatorChatMessages, setTemplateCreatorChatMessages] = useLocalStorage<ChatMessage[]>(STORAGE_KEYS.AI_CHAT_MESSAGES_TEMPLATE_CREATOR, []);
+  
   const [isAiResponding, setIsAiResponding] = useState(false);
+  const [currentTemplateDataToApply, setCurrentTemplateDataToApply] = useState<FocusForgeTemplateData | null>(null);
 
-  const handleAiChatSend = async (messageText: string) => {
-    if (!messageText.trim()) return;
+
+  const chatMessages = currentAiMode === AiFeatureMode.Coach ? coachChatMessages : templateCreatorChatMessages;
+  const setChatMessages = currentAiMode === AiFeatureMode.Coach ? setCoachChatMessages : setTemplateCreatorChatMessages;
+
+  const getSystemInstruction = (mode: AiFeatureMode): string => {
+    if (mode === AiFeatureMode.TemplateCreator) {
+      return t('aiTemplateCreatorSystemInstruction');
+    }
+    return t('aiCoachSystemInstruction'); 
+  };
+  
+  const getJsonGenerationSystemInstruction = (): string => {
+    return t('aiTemplateCreatorJsonSystemInstruction', {
+        habitsSchema: JSON.stringify({id: "string", name: "string", streak: "number (default 0)", lastCompletedDate: "yyyy-MM-dd | null (default null)", consequence: "string | undefined", targetDays: "number[] (0=Sun, 6=Sat) | undefined"}),
+        weeklyMissionSchema: JSON.stringify({id: "string", text: "string", deadline: "ISOString (7 days from now if not specified)"}),
+        weeklyPlansSchema: JSON.stringify({id: "string", weekStartDate: "yyyy-MM-dd (upcoming Monday)", mainGoal: "string", majorTasks: [{id:"string", text:"string", completed: "boolean (default false)"}] }),
+        scheduledGoalsSchema: JSON.stringify({id: "string", title: "string", date: "yyyy-MM-dd", time: "HH:MM | undefined", isGoal: "boolean", completed: "boolean (default false)"})
+    });
+  };
+
+  const handleAiChatSend = async (messageText: string, action?: 'confirm_generate_template' | 'confirm_apply_template') => {
+    const userMessageText = action ? (action === 'confirm_generate_template' ? t('aiTemplateCreatorUserConfirmedGenerate') : messageText) : messageText;
+    if (!userMessageText.trim() && !action) return;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
-      text: messageText,
+      text: userMessageText,
       sender: 'user',
       timestamp: Date.now(),
     };
-    const updatedMessages = [...chatMessages, userMessage];
+    
+    let updatedMessages = [...chatMessages, userMessage];
     setChatMessages(updatedMessages);
     setIsAiResponding(true);
+    setCurrentTemplateDataToApply(null); // Clear any pending template
 
     try {
-      const aiResponseText = await getAiChatResponse(updatedMessages);
-      const aiMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        text: aiResponseText,
-        sender: 'ai',
-        timestamp: Date.now(),
-      };
-      setChatMessages(prev => [...prev, aiMessage]);
+      let aiResponseText: string;
+      let aiResponseMessage: ChatMessage;
+
+      if (currentAiMode === AiFeatureMode.TemplateCreator && action === 'confirm_generate_template') {
+        // User confirmed to generate the template JSON
+        const templateData = await generateTemplateDataFromConversation(updatedMessages, getJsonGenerationSystemInstruction());
+        if (templateData) {
+          aiResponseText = t('aiTemplateCreatorGeneratedSuccess');
+           // Present a summary of the template data for confirmation
+          let summary = `${t('aiTemplateCreatorSummaryPrefix')}\n`;
+          if (templateData.weeklyMission) summary += `- ${t('weeklyMissionLabel')}: ${templateData.weeklyMission.text}\n`;
+          if (templateData.habits.length > 0) summary += `- ${t('habitsLabel')}: ${templateData.habits.map(h => h.name).join(', ')}\n`;
+          if (templateData.weeklyPlans.length > 0) summary += `- ${t('weeklyPlansLabel')}: ${templateData.weeklyPlans[0].mainGoal}\n`; // Assuming one plan for now
+          if (templateData.scheduledGoals.length > 0) summary += `- ${t('scheduledGoalsLabel')}: ${templateData.scheduledGoals.length} ${t('scheduledGoalsCountSuffix')}\n`;
+          summary += `\n${t('aiTemplateCreatorConfirmApplyPrompt')}`;
+          
+          aiResponseText = summary;
+
+          aiResponseMessage = {
+            id: (Date.now() + 1).toString(),
+            text: aiResponseText,
+            sender: 'ai',
+            timestamp: Date.now(),
+            expectsConfirmation: 'apply_template',
+            templateData: templateData
+          };
+        } else {
+          aiResponseText = t('aiTemplateCreatorGeneratedError');
+           aiResponseMessage = {
+            id: (Date.now() + 1).toString(),
+            text: aiResponseText,
+            sender: 'ai',
+            timestamp: Date.now(),
+          };
+        }
+      } else if (currentAiMode === AiFeatureMode.TemplateCreator && action === 'confirm_apply_template') {
+          // This case is handled by the Apply Template button, AI just acknowledges if user types "cancel" or similar.
+          // If the user types something instead of clicking apply/cancel, the AI should respond normally.
+          // For now, if action is confirm_apply_template, it means user clicked Cancel (or typed it).
+          aiResponseText = t('aiTemplateCreatorApplyCancelledByResponse');
+           aiResponseMessage = {
+            id: (Date.now() + 1).toString(),
+            text: aiResponseText,
+            sender: 'ai',
+            timestamp: Date.now(),
+          };
+      }
+      else {
+        // Standard chat response or initial phase of template creation
+        aiResponseText = await getAiChatResponse(updatedMessages, getSystemInstruction(currentAiMode));
+        
+        aiResponseMessage = {
+            id: (Date.now() + 1).toString(),
+            text: aiResponseText,
+            sender: 'ai',
+            timestamp: Date.now(),
+        };
+
+        // Heuristic to check if AI is asking to proceed with JSON generation for Template Creator
+        if (currentAiMode === AiFeatureMode.TemplateCreator && 
+            (aiResponseText.toLowerCase().includes(t('aiTemplateCreatorReadyToGeneratePromptWord1').toLowerCase()) || aiResponseText.toLowerCase().includes(t('aiTemplateCreatorReadyToGeneratePromptWord2').toLowerCase())) &&
+            !action) { // and no action means it's not already a confirmation
+            aiResponseMessage.expectsConfirmation = 'generate_template';
+        }
+      }
+      setChatMessages(prev => [...prev, aiResponseMessage]);
+
     } catch (error) {
       console.error("AI Chat Error:", error);
       const errorMessage: ChatMessage = {
@@ -57,7 +148,77 @@ const MainApp: React.FC = () => {
     }
   };
   
-  // Update document title with translated app name
+  const handleApplyGeneratedTemplate = (templateData: FocusForgeTemplateData) => {
+      const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+      const dynamicData: FocusForgeTemplateData = {
+          ...templateData,
+          weeklyMission: templateData.weeklyMission 
+              ? { ...templateData.weeklyMission, deadline: templateData.weeklyMission.deadline || addDays(new Date(), 7).toISOString(), id: templateData.weeklyMission.id || `mission_${Date.now()}` } 
+              : null,
+          scheduledGoals: templateData.scheduledGoals.map((goal, i) => ({ 
+              ...goal, 
+              date: goal.date || format(addDays(weekStart, i % 7), 'yyyy-MM-dd'), // Distribute over the week if date missing
+              id: goal.id || `goal_applied_${Date.now()}_${i}`
+          })),
+          weeklyPlans: templateData.weeklyPlans.map((plan,i) => ({
+              ...plan,
+              weekStartDate: plan.weekStartDate || format(weekStart, 'yyyy-MM-dd'),
+              id: plan.id || `plan_applied_${Date.now()}_${i}`,
+              majorTasks: plan.majorTasks.map((mt, j) => ({...mt, id: mt.id || `task_applied_${plan.id}_${Date.now()}_${j}`}))
+          })),
+          habits: templateData.habits.map((h,i) => ({
+              ...h, 
+              streak: h.streak || 0, 
+              lastCompletedDate: h.lastCompletedDate || null,
+              id: h.id || `habit_applied_${Date.now()}_${i}`
+          }))
+      };
+
+      saveData<WeeklyPlan[]>(STORAGE_KEYS.WEEKLY_PLANS, dynamicData.weeklyPlans);
+      saveData<Habit[]>(STORAGE_KEYS.HABITS, dynamicData.habits);
+      saveData<ScheduledGoal[]>(STORAGE_KEYS.SCHEDULED_GOALS, dynamicData.scheduledGoals);
+      saveData<WeeklyMission | null>(STORAGE_KEYS.WEEKLY_MISSION, dynamicData.weeklyMission);
+      
+      const successMessage: ChatMessage = {
+          id: Date.now().toString(),
+          text: t('aiTemplateCreatorApplySuccess'),
+          sender: 'ai',
+          timestamp: Date.now()
+      };
+      setTemplateCreatorChatMessages(prev => [...prev, successMessage]); // Add to template creator chat
+      setCurrentTemplateDataToApply(null);
+      setIsAiChatModalOpen(false); // Close modal after applying
+      alert(t('aiTemplateCreatorApplySuccessAlert'));
+      navigate('/'); // Navigate to dashboard
+  };
+
+
+  const handleOpenAiFeatureSelection = () => {
+    setIsAiFeatureSelectionModalOpen(true);
+  };
+
+  const handleSelectAiFeature = (feature: AiFeatureMode) => {
+    setCurrentAiMode(feature);
+    setIsAiFeatureSelectionModalOpen(false);
+    setIsAiChatModalOpen(true);
+    // Add initial greeting message if chat is empty for template creator
+    if (feature === AiFeatureMode.TemplateCreator && templateCreatorChatMessages.length === 0) {
+        setTemplateCreatorChatMessages([{
+            id: 'init_template_creator',
+            text: t('aiTemplateCreatorInitialGreeting'),
+            sender: 'ai',
+            timestamp: Date.now()
+        }]);
+    } else if (feature === AiFeatureMode.Coach && coachChatMessages.length === 0) {
+         setCoachChatMessages([{
+            id: 'init_coach',
+            text: t('aiCoachInitialGreeting'),
+            sender: 'ai',
+            timestamp: Date.now()
+        }]);
+    }
+  };
+  
   React.useEffect(() => {
     document.title = t(APP_NAME_TRANSLATION_KEY);
   }, [t, language]);
@@ -94,18 +255,32 @@ const MainApp: React.FC = () => {
         
         <FloatingActionButtons
           onHelpClick={() => setIsHelpModalOpen(true)}
-          onAiCoachClick={() => setIsAiChatModalOpen(true)}
+          onAiFeatureSelectClick={handleOpenAiFeatureSelection}
         />
 
         <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} />
         
-        <AiChatModal
-          isOpen={isAiChatModalOpen}
-          onClose={() => setIsAiChatModalOpen(false)}
-          chatMessages={chatMessages}
-          onSendMessage={handleAiChatSend}
-          isAiResponding={isAiResponding}
+        <AiFeatureSelectionModal
+          isOpen={isAiFeatureSelectionModalOpen}
+          onClose={() => setIsAiFeatureSelectionModalOpen(false)}
+          onSelectFeature={handleSelectAiFeature}
         />
+
+        {isAiChatModalOpen && (
+            <AiChatModal
+              isOpen={isAiChatModalOpen}
+              onClose={() => {
+                setIsAiChatModalOpen(false);
+                setCurrentTemplateDataToApply(null); // Clear pending template on close
+              }}
+              aiMode={currentAiMode}
+              chatMessages={chatMessages}
+              onSendMessage={handleAiChatSend}
+              onApplyGeneratedTemplate={handleApplyGeneratedTemplate}
+              isAiResponding={isAiResponding}
+              currentTemplateDataToApply={currentTemplateDataToApply}
+            />
+        )}
       </div>
     </div>
   );
@@ -114,9 +289,6 @@ const MainApp: React.FC = () => {
 
 const App: React.FC = () => {
   const [onboardingCompleted, setOnboardingCompleted] = useLocalStorage<boolean>(STORAGE_KEYS.ONBOARDING_COMPLETED, false);
-
-  // This initial language load is for the OnboardingPage itself if it needs to access language before full context is ready for MainApp.
-  // The LanguageProvider will manage the language for the MainApp.
   const initialLanguage = loadData<Language>(STORAGE_KEYS.LANGUAGE, 'en');
 
 
@@ -131,9 +303,8 @@ const App: React.FC = () => {
                 <OnboardingPage 
                   initialLanguage={initialLanguage}
                   onComplete={(selectedLang: Language) => {
-                    saveData<Language>(STORAGE_KEYS.LANGUAGE, selectedLang); // Save chosen lang
+                    saveData<Language>(STORAGE_KEYS.LANGUAGE, selectedLang); 
                     setOnboardingCompleted(true);
-                     // setLanguage in provider will be updated by this save & reload or context update
                   }} 
                 />
               } 

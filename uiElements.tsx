@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Theme, PomodoroMode, ChatMessage, Language } from './types';
+import { Theme, PomodoroMode, ChatMessage, Language, AiFeatureMode, FocusForgeTemplateData } from './types';
 import { Icons, APP_NAME_TRANSLATION_KEY, STORAGE_KEYS } from './constants';
 import { PomodoroSettings, usePomodoro } from './hooks';
 import { useLanguageContext } from './contexts'; // Import useLanguageContext
@@ -46,8 +46,9 @@ interface ModalProps {
   children: ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'; 
   contentClassName?: string;
+  footerContent?: ReactNode; // Optional footer for modals
 }
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 'md', contentClassName }) => {
+export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 'md', contentClassName, footerContent }) => {
   const { t } = useLanguageContext();
   if (!isOpen) return null;
 
@@ -68,7 +69,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
       onClick={onClose} 
     >
       <div 
-        className={`bg-bglight dark:bg-bgdark-surface rounded-none sm:rounded-lg shadow-2xl w-full ${sizeClasses[size]} ${modalHeightClass} max-h-full sm:max-h-[85vh] transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modalShow flex flex-col`}
+        className={`bg-bglight dark:bg-bgdark-surface rounded-none sm:rounded-lg shadow-2xl w-full ${sizeClasses[size]} ${modalHeightClass} max-h-full sm:max-h-[95vh] transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modalShow flex flex-col`}
         onClick={(e) => e.stopPropagation()} 
       >
         <div className="flex justify-between items-center p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
@@ -84,6 +85,11 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
         <div className={`p-4 sm:p-6 overflow-y-auto flex-grow ${contentClassName}`}>
           {children}
         </div>
+        {footerContent && (
+          <div className="p-4 sm:p-6 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+            {footerContent}
+          </div>
+        )}
       </div>
       <style>{`
         @keyframes modalShow {
@@ -242,10 +248,25 @@ export const Button: React.FC<ButtonProps> = ({ children, variant = 'primary', s
 // --- PomodoroControls Component ---
 interface PomodoroControlsProps {
   pomodoro: ReturnType<typeof usePomodoro>;
+  breakInvitationMessage?: string | null;
 }
-export const PomodoroControls: React.FC<PomodoroControlsProps> = ({ pomodoro }) => {
-  const { timeLeft, isRunning, mode, startTimer, pauseTimer, resetTimer, skipBreak, changeMode } = pomodoro;
+export const PomodoroControls: React.FC<PomodoroControlsProps> = ({ pomodoro, breakInvitationMessage }) => {
+  const { 
+    timeLeft, 
+    isRunning, 
+    mode, 
+    startTimer, 
+    pauseTimer, 
+    resetTimer, 
+    skipBreak, 
+    changeMode,
+    isFocusMusicMuted,
+    toggleFocusMusicMute,
+    customFocusMusicFileName,
+    handleFocusMusicUpload
+  } = pomodoro;
   const { t } = useLanguageContext();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -269,6 +290,13 @@ export const PomodoroControls: React.FC<PomodoroControlsProps> = ({ pomodoro }) 
     [PomodoroMode.Work]: t('pomodoroModeFocus'),
     [PomodoroMode.ShortBreak]: t('pomodoroModeShortBreak'),
     [PomodoroMode.LongBreak]: t('pomodoroModeLongBreak'),
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      handleFocusMusicUpload(file);
+    }
   };
 
   return (
@@ -307,18 +335,72 @@ export const PomodoroControls: React.FC<PomodoroControlsProps> = ({ pomodoro }) 
         </div>
       </div>
       
-      <div className="flex justify-center space-x-2 sm:space-x-3">
+      <div className="flex justify-center items-center space-x-2 sm:space-x-3">
         {!isRunning ? (
           <Button onClick={startTimer} size="md" variant="primary" leftIcon={<Icons.Play className="w-5 h-5 sm:w-6 sm:h-6" />} translationKey="pomodoroButtonStart"/>
         ) : (
           <Button onClick={pauseTimer} size="md" variant="secondary" leftIcon={<Icons.Pause className="w-5 h-5 sm:w-6 sm:h-6" />} translationKey="pomodoroButtonPause"/>
         )}
         <Button onClick={resetTimer} size="md" variant="ghost" leftIcon={<Icons.Stop className="w-5 h-5 sm:w-6 sm:h-6" />} translationKey="pomodoroButtonReset"/>
+        {mode === PomodoroMode.Work && customFocusMusicFileName && isRunning && (
+            <Button 
+                onClick={toggleFocusMusicMute} 
+                variant="ghost" 
+                size="sm" 
+                isRound 
+                aria-label={isFocusMusicMuted ? t('pomodoroUnmuteFocusMusic') : t('pomodoroMuteFocusMusic')}
+                className="p-2"
+            >
+                {isFocusMusicMuted ? <Icons.SpeakerXMark className="w-5 h-5" /> : <Icons.SpeakerWave className="w-5 h-5" />}
+            </Button>
+        )}
       </div>
+
       {(mode === PomodoroMode.ShortBreak || mode === PomodoroMode.LongBreak) && isRunning && (
         <Button onClick={skipBreak} variant="ghost" size="sm" className="mt-3 text-xs sm:text-sm text-primary" translationKey="pomodoroButtonSkipBreak"/>
       )}
-       <p className="text-xs sm:text-sm text-textlight-muted dark:text-textdark-muted mt-3">{t('dashboardPomodorosCompleted', { count: pomodoro.pomodorosCompleted })}</p>
+      <p className="text-xs sm:text-sm text-textlight-muted dark:text-textdark-muted mt-3">{t('dashboardPomodorosCompleted', { count: pomodoro.pomodorosCompleted })}</p>
+      
+      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
+        <input 
+            type="file" 
+            accept="audio/*" 
+            onChange={handleFileChange} 
+            className="hidden" 
+            ref={fileInputRef} 
+            id="focus-music-upload"
+        />
+        <Button 
+            onClick={() => fileInputRef.current?.click()} 
+            variant="secondary" 
+            size="sm" 
+            leftIcon={<Icons.MusicNote className="w-4 h-4" />}
+            translationKey="pomodoroUploadFocusMusicLabel"
+            className="w-full sm:w-auto"
+        />
+        {customFocusMusicFileName ? (
+            <div className="flex items-center justify-center space-x-2 text-xs sm:text-sm text-textlight-muted dark:text-textdark-muted">
+                <span>{t('pomodoroFocusMusicPlaying', {fileName: customFocusMusicFileName})}</span>
+                <Button 
+                    onClick={() => handleFocusMusicUpload(null)} 
+                    variant="ghost" 
+                    size="sm" 
+                    isRound
+                    className="p-1 text-red-500 hover:bg-red-500/10"
+                    aria-label={t('pomodoroClearFocusMusicLabel')}
+                >
+                    <Icons.XCircle className="w-4 h-4" />
+                </Button>
+            </div>
+        ) : (
+            <p className="text-xs sm:text-sm text-textlight-muted dark:text-textdark-muted">{t('pomodoroNoFocusMusicSelected')}</p>
+        )}
+         <p className="text-xs text-textlight-muted dark:text-textdark-muted italic">{t('pomodoroFocusMusicNote')}</p>
+      </div>
+
+      {breakInvitationMessage && (
+        <p className="mt-2 text-sm text-accent dark:text-accent font-semibold animate-pulse">{breakInvitationMessage}</p>
+      )}
     </div>
   );
 };
@@ -530,13 +612,13 @@ export const Card: React.FC<CardProps> = ({ title, children, className, icon, ti
 // --- FloatingActionButtons Component ---
 interface FloatingActionButtonsProps {
   onHelpClick: () => void;
-  onAiCoachClick: () => void;
+  onAiFeatureSelectClick: () => void;
 }
-export const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({ onHelpClick, onAiCoachClick }) => {
+export const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({ onHelpClick, onAiFeatureSelectClick }) => {
   const { t } = useLanguageContext();
   return (
-    <div className="fixed bottom-6 right-6 space-y-3 z-30">
-      <Button
+    <div className="fixed bottom-6 right-6 space-y-3 z-30 grid-rows-2">
+      <div><Button
         onClick={onHelpClick}
         variant="fab"
         size="fab"
@@ -545,16 +627,16 @@ export const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({ on
         className="bg-secondary hover:bg-secondary-dark dark:bg-secondary-dark dark:hover:bg-secondary text-textlight dark:text-textdark"
       >
         <Icons.QuestionMarkCircle className="w-5 h-5 sm:w-5 h-5" />
-      </Button>
-      <Button
-        onClick={onAiCoachClick}
+      </Button></div>
+      <div><Button
+        onClick={onAiFeatureSelectClick} // Changed from onAiCoachClick
         variant="fab"
         size="fab"
         isRound
-        aria-label={t('aiCoachModalTitle')}
+        aria-label={t('aiFeatureSelectionTitle')} // Changed from aiCoachModalTitle
       >
         <Icons.Sparkles className="w-7 h-7 sm:w-8 sm:h-8" />
-      </Button>
+      </Button></div>
     </div>
   );
 };
@@ -575,6 +657,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
     { titleKey: "helpPlansTitle", descriptionKey: "helpPlansDesc", tipKey: "helpPlansTip" },
     { titleKey: "helpDisciplineTitle", descriptionKey: "helpDisciplineDesc", tipKey: "helpDisciplineTip" },
     { titleKey: "helpAiCoachTitle", descriptionKey: "helpAiCoachDesc", tipKey: "helpAiCoachTip" },
+    { titleKey: "helpAiTemplateCreatorTitle", descriptionKey: "helpAiTemplateCreatorDesc", tipKey: "helpAiTemplateCreatorTip" },
     { titleKey: "helpImportExportTitle", descriptionKey: "helpImportExportDesc", tipKey: "helpImportExportTip" },
     { titleKey: "helpAboutTitle", descriptionKey: "helpAboutDesc", tipKey: "helpAboutTip" }
   ];
@@ -589,23 +672,83 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
             <p className="text-xs sm:text-sm text-textlight-muted dark:text-textdark-muted italic"><strong>{t('helpTipLabel')}:</strong> {t(item.tipKey)}</p>
           </div>
         ))}
+        <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <h4 className="font-semibold text-md sm:text-lg text-primary mb-2">{t('helpTelegramGroupTitle')}</h4>
+          <p className="mb-3 text-textlight dark:text-textdark whitespace-pre-line">{t('helpTelegramGroupDesc')}</p>
+          <Button
+            onClick={() => window.open('https://t.me/focus_forge', '_blank', 'noopener,noreferrer')}
+            variant="secondary"
+            className="w-full"
+            leftIcon={<Icons.ChatBubbleLeftEllipsis className="w-5 h-5" />}
+            translationKey="helpTelegramGroupButton"
+          />
+        </div>
       </div>
     </Modal>
   );
 };
 
+
+// --- AiFeatureSelectionModal Component ---
+interface AiFeatureSelectionModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelectFeature: (feature: AiFeatureMode) => void;
+}
+export const AiFeatureSelectionModal: React.FC<AiFeatureSelectionModalProps> = ({ isOpen, onClose, onSelectFeature }) => {
+  const { t } = useLanguageContext();
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={t('aiFeatureSelectionTitle')} size="sm">
+      <div className="space-y-3">
+        <Button 
+          onClick={() => onSelectFeature(AiFeatureMode.Coach)}
+          variant="secondary" 
+          className="w-full"
+          leftIcon={<Icons.ChatBubbleLeftEllipsis className="w-5 h-5" />}
+        >
+          {t('aiFeatureCoachButton')}
+        </Button>
+        <Button 
+          onClick={() => onSelectFeature(AiFeatureMode.TemplateCreator)}
+          variant="secondary" 
+          className="w-full"
+          leftIcon={<Icons.Template className="w-5 h-5" />}
+        >
+          {t('aiFeatureTemplateCreatorButton')}
+        </Button>
+      </div>
+    </Modal>
+  );
+};
+
+
 // --- AiChatModal Component ---
 interface AiChatModalProps {
   isOpen: boolean;
   onClose: () => void;
+  aiMode: AiFeatureMode;
   chatMessages: ChatMessage[];
-  onSendMessage: (messageText: string) => Promise<void>;
+  onSendMessage: (messageText: string, action?: 'confirm_generate_template' | 'confirm_apply_template') => Promise<void>;
+  onApplyGeneratedTemplate?: (templateData: FocusForgeTemplateData) => void;
   isAiResponding: boolean;
+  currentTemplateDataToApply?: FocusForgeTemplateData | null; // For TemplateCreator mode
 }
-export const AiChatModal: React.FC<AiChatModalProps> = ({ isOpen, onClose, chatMessages, onSendMessage, isAiResponding }) => {
+export const AiChatModal: React.FC<AiChatModalProps> = ({ 
+    isOpen, 
+    onClose, 
+    aiMode,
+    chatMessages, 
+    onSendMessage, 
+    onApplyGeneratedTemplate,
+    isAiResponding,
+    currentTemplateDataToApply // This prop seems unused, but keeping it as it was in the original structure.
+}) => {
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { t } = useLanguageContext();
+
+  const modalTitle = aiMode === AiFeatureMode.Coach ? t('aiCoachModalTitle') : t('aiTemplateCreatorModalTitle');
+  const inputPlaceholder = aiMode === AiFeatureMode.Coach ? t('aiCoachInputPlaceholder') : t('aiTemplateCreatorInputPlaceholder');
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -613,22 +756,86 @@ export const AiChatModal: React.FC<AiChatModalProps> = ({ isOpen, onClose, chatM
 
   useEffect(scrollToBottom, [chatMessages]);
 
-  const handleSend = async () => {
-    if (newMessage.trim() === '' || isAiResponding) return;
-    const messageToSend = newMessage;
-    setNewMessage('');
-    await onSendMessage(messageToSend);
+  const handleSend = async (
+    explicitMessageTextArg?: string | null, // If string, use it as message. If null, use newMessage from state.
+    actionTypeArg?: 'confirm_generate_template' | 'confirm_apply_template'
+  ) => {
+    const textToUse = (typeof explicitMessageTextArg === 'string') ? explicitMessageTextArg : newMessage;
+    const actionToUse = actionTypeArg;
+
+    // Prevent sending if not an action, text is empty, and no template is pending to apply (original condition)
+    if (!actionToUse && textToUse.trim() === '' && !latestMessage?.templateData) return;
+    
+    // Prevent sending general messages if AI is responding (action buttons have their own disabled state)
+    if (isAiResponding && !actionToUse) {
+      return;
+    }
+
+    if (typeof explicitMessageTextArg !== 'string') { // Only clear input if message came from state (newMessage)
+      setNewMessage('');
+    }
+    await onSendMessage(textToUse, actionToUse);
   };
   
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      handleSend(null); // Send message from input, no specific action
     }
   };
 
+  const latestMessage = chatMessages[chatMessages.length -1];
+  const showGenerateTemplateButton = aiMode === AiFeatureMode.TemplateCreator && latestMessage?.sender === 'ai' && latestMessage?.expectsConfirmation === 'generate_template';
+  const showApplyTemplateButtons = aiMode === AiFeatureMode.TemplateCreator && latestMessage?.sender === 'ai' && latestMessage?.expectsConfirmation === 'apply_template' && latestMessage?.templateData && onApplyGeneratedTemplate;
+
+
+  const chatInputFooter = (
+      <div className="flex items-center space-x-2">
+        <textarea
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          onKeyDown={handleKeyPress}
+          placeholder={inputPlaceholder}
+          className="flex-grow p-2 sm:p-2.5 border border-gray-300 dark:border-gray-600 rounded-md bg-bglight-surface dark:bg-bgdark text-textlight dark:text-textdark focus:ring-1 focus:ring-primary focus:border-primary resize-none text-sm sm:text-base"
+          rows={1}
+          disabled={isAiResponding || showGenerateTemplateButton || !!showApplyTemplateButtons}
+          aria-label={inputPlaceholder}
+        />
+        <Button onClick={() => handleSend(null)} disabled={isAiResponding || !newMessage.trim() || showGenerateTemplateButton || !!showApplyTemplateButtons} size="md" isRound aria-label={t('aiCoachSendButtonLabel')}>
+          <Icons.PaperAirplane className="w-5 h-5" />
+        </Button>
+      </div>
+  );
+  
+  const templateActionFooter = (
+    <div className="space-y-2">
+        {showGenerateTemplateButton && (
+            <Button onClick={() => handleSend('', 'confirm_generate_template')} variant="primary" className="w-full" translationKey="aiTemplateCreatorConfirmGenerateButton" disabled={isAiResponding} />
+        )}
+        {showApplyTemplateButtons && latestMessage.templateData && onApplyGeneratedTemplate && (
+            <div className="space-y-2 sm:space-y-0 sm:flex sm:space-x-2">
+                <Button onClick={() => {
+                    if (latestMessage.templateData) {
+                       onApplyGeneratedTemplate(latestMessage.templateData);
+                       onClose(); // Close modal after applying
+                    }
+                }} variant="primary" className="w-full sm:flex-1" translationKey="aiTemplateCreatorApplyButton" disabled={isAiResponding} />
+                <Button onClick={() => handleSend(t('aiTemplateCreatorUserCancelledApply'), 'confirm_apply_template')} variant="secondary" className="w-full sm:flex-1" translationKey="aiTemplateCreatorCancelButton" disabled={isAiResponding}/>
+            </div>
+        )}
+    </div>
+  );
+
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={t('aiCoachModalTitle')} size="full" contentClassName="flex flex-col !p-0 sm:!p-0">
+    <Modal 
+        isOpen={isOpen} 
+        onClose={onClose} 
+        title={modalTitle} 
+        size="full" 
+        contentClassName="flex flex-col !p-0 sm:!p-0"
+        footerContent={showGenerateTemplateButton || showApplyTemplateButtons ? templateActionFooter : chatInputFooter}
+    >
       <div className="flex-grow overflow-y-auto space-y-3 sm:space-y-4 p-3 sm:p-4 mb-2 sm:mb-3">
         {chatMessages.map(msg => (
           <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -638,7 +845,7 @@ export const AiChatModal: React.FC<AiChatModalProps> = ({ isOpen, onClose, chatM
                 : 'bg-bglight-muted dark:bg-bgdark-muted text-textlight dark:text-textdark rounded-bl-none'
             }`}>
               <div className="flex items-start space-x-2">
-                {msg.sender === 'ai' && <Icons.ChatBubbleLeftEllipsis className="w-5 h-5 sm:w-6 sm:h-6 text-primary flex-shrink-0 mt-0.5" />}
+                {msg.sender === 'ai' && (aiMode === AiFeatureMode.Coach ? <Icons.ChatBubbleLeftEllipsis className="w-5 h-5 sm:w-6 sm:h-6 text-primary flex-shrink-0 mt-0.5" /> : <Icons.Template className="w-5 h-5 sm:w-6 sm:h-6 text-primary flex-shrink-0 mt-0.5" />)}
                 <p className="text-sm sm:text-base whitespace-pre-wrap break-words">{msg.text}</p>
                 {msg.sender === 'user' && <Icons.UserCircle className="w-5 h-5 sm:w-6 sm:h-6 text-white/80 flex-shrink-0 mt-0.5" />}
               </div>
@@ -656,23 +863,6 @@ export const AiChatModal: React.FC<AiChatModalProps> = ({ isOpen, onClose, chatM
           </div>
         )}
         <div ref={messagesEndRef} />
-      </div>
-      <div className="mt-auto p-3 sm:p-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
-        <div className="flex items-center space-x-2">
-          <textarea
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyDown={handleKeyPress}
-            placeholder={t('aiCoachInputPlaceholder')}
-            className="flex-grow p-2 sm:p-2.5 border border-gray-300 dark:border-gray-600 rounded-md bg-bglight-surface dark:bg-bgdark text-textlight dark:text-textdark focus:ring-1 focus:ring-primary focus:border-primary resize-none text-sm sm:text-base"
-            rows={1}
-            disabled={isAiResponding}
-            aria-label={t('aiCoachInputPlaceholder')}
-          />
-          <Button onClick={handleSend} disabled={isAiResponding || !newMessage.trim()} size="md" isRound aria-label={t('aiCoachSendButtonLabel')}>
-            <Icons.PaperAirplane className="w-5 h-5" />
-          </Button>
-        </div>
       </div>
     </Modal>
   );

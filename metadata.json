@@ -1,5 +1,6 @@
 {
   "name": "Focus Forge",
   "description": "A comprehensive productivity and personal well-being application designed to help users manage daily tasks, track mood and energy levels, maintain a journal, plan weekly goals, monitor time usage, review progress, and build positive habits for enhanced focus and discipline.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "prompt": ""
 }

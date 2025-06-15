@@ -92,6 +92,9 @@ export interface ChatMessage {
   text: string;
   sender: 'user' | 'ai';
   timestamp: number;
+  // Optional fields for Template Creator mode
+  expectsConfirmation?: 'generate_template' | 'apply_template'; 
+  templateData?: FocusForgeTemplateData; // To hold generated template data before applying
 }
 
 // --- Import/Export Template Structure ---
@@ -107,4 +110,9 @@ export interface FocusForgeTemplate {
   appName: string; // Could be a key if appName itself is translated, e.g. 'appNameKey'
   exportedDate: string; // ISO string
   data: FocusForgeTemplateData;
+}
+
+export enum AiFeatureMode {
+  Coach = 'Coach',
+  TemplateCreator = 'TemplateCreator',
 }

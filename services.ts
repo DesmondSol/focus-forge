@@ -1,7 +1,7 @@
 
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { DEFAULT_MOTIVATIONAL_QUOTE_KEY, GEMINI_API_KEY_ERROR_MESSAGE, GEMINI_GENERAL_ERROR_MESSAGE } from './constants';
-import { ChatMessage, TimeLog, JournalEntry, Habit, ScheduledGoal, WeeklyPlan } from './types';
+import { ChatMessage, TimeLog, JournalEntry, Habit, ScheduledGoal, WeeklyPlan, FocusForgeTemplateData } from './types';
 import { format, addDays } from 'date-fns';
 import parseISO from 'date-fns/parseISO'; // Corrected import
 import { translations } from './translations';
@@ -33,16 +33,29 @@ export function saveData<T,>(key: string, value: T): void {
 // --- Gemini Service ---
 
 let ai: GoogleGenAI | null = null;
+let initializing = false; // Prevent race conditions during initialization
 
 const getAiClient = (): GoogleGenAI | null => {
   if (ai) return ai;
+  if (initializing) { // If already initializing, wait for it to complete or handle as needed
+      console.warn("AI client is already initializing.");
+      return null; // Or throw an error, or return a promise
+  }
+  initializing = true;
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
     console.error(GEMINI_API_KEY_ERROR_MESSAGE);
-    // Optionally, notify the user through a global state/context if UI feedback is needed
+    initializing = false;
     return null;
   }
-  ai = new GoogleGenAI({ apiKey });
+  try {
+    ai = new GoogleGenAI({ apiKey });
+  } catch (error) {
+    console.error("Failed to initialize GoogleGenAI client:", error);
+    ai = null;
+  } finally {
+    initializing = false;
+  }
   return ai;
 };
 
@@ -106,17 +119,14 @@ export async function generateContentWithSystemInstruction(prompt: string, syste
     }
 }
 
-export async function getAiChatResponse(messages: ChatMessage[]): Promise<string> {
+export async function getAiChatResponse(messages: ChatMessage[], systemInstruction: string): Promise<string> {
   const client = getAiClient();
   if (!client) {
     return "AI Coach unavailable: API Key not configured.";
   }
-
-  const systemInstruction = "You are FocusForge AI, an expert productivity coach. Your goal is to help the user stay focused, build discipline, and achieve their goals. Analyze their input and provide actionable advice, summaries of their performance based on the chat, and suggestions for improvement. Keep responses concise and encouraging. If asked for a detailed weekly report, gently guide them to use the 'Generate AI Review' button in the Review section for a comprehensive analysis of their logged data, but offer to give a brief conceptual summary if they press.";
   
-  // Construct a simple history string for the prompt
   const history = messages.map(msg => `${msg.sender === 'user' ? 'User' : 'AI'}: ${msg.text}`).join('\n');
-  const currentPrompt = messages.length > 0 ? messages[messages.length -1].text : "Hello, coach!";
+  const currentPrompt = messages.length > 0 ? messages[messages.length -1].text : "Hello!";
 
 
   try {
@@ -131,6 +141,68 @@ export async function getAiChatResponse(messages: ChatMessage[]): Promise<string
     return GEMINI_GENERAL_ERROR_MESSAGE;
   }
 }
+
+
+export async function generateTemplateDataFromConversation(
+  messages: ChatMessage[],
+  jsonGenerationSystemInstruction: string
+): Promise<FocusForgeTemplateData | null> {
+  const client = getAiClient();
+  if (!client) {
+    console.error("AI Template Creator unavailable: API Key not configured.");
+    return null;
+  }
+
+  const conversationHistory = messages.map(msg => `${msg.sender === 'user' ? 'User' : 'AI'}: ${msg.text}`).join('\n');
+  const prompt = `Conversation History:\n${conversationHistory}\n\nUser: Based on our conversation, please generate the FocusForgeTemplateData JSON.`;
+
+  try {
+    const response = await client.models.generateContent({
+      model: "gemini-2.5-flash-preview-04-17",
+      contents: prompt,
+      config: {
+        systemInstruction: jsonGenerationSystemInstruction,
+        responseMimeType: "application/json",
+      },
+    });
+
+    let jsonStr = response.text.trim();
+    const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
+    const match = jsonStr.match(fenceRegex);
+    if (match && match[2]) {
+      jsonStr = match[2].trim();
+    }
+    
+    const parsedData = JSON.parse(jsonStr) as FocusForgeTemplateData;
+    // Basic validation (can be expanded)
+    if (parsedData && parsedData.habits && parsedData.weeklyPlans && parsedData.scheduledGoals) {
+        // Ensure IDs are strings and unique (basic check, could be more robust)
+        const ensureStringId = (item: any, prefix: string, index: number) => {
+            if (typeof item.id !== 'string' || !item.id) {
+                item.id = `${prefix}_${Date.now()}_${index}`;
+            }
+            return item;
+        };
+        parsedData.habits = parsedData.habits.map((h, i) => ensureStringId(h, 'habit', i));
+        parsedData.weeklyPlans = parsedData.weeklyPlans.map((p, i) => {
+            p = ensureStringId(p, 'plan', i);
+            p.majorTasks = p.majorTasks.map((mt, j) => ensureStringId(mt, `task_${p.id}`, j));
+            return p;
+        });
+        parsedData.scheduledGoals = parsedData.scheduledGoals.map((g, i) => ensureStringId(g, 'goal', i));
+        if(parsedData.weeklyMission && (typeof parsedData.weeklyMission.id !== 'string' || !parsedData.weeklyMission.id)) {
+            parsedData.weeklyMission.id = `mission_${Date.now()}`;
+        }
+      return parsedData;
+    }
+    console.error("Generated JSON does not match expected FocusForgeTemplateData structure.", parsedData);
+    return null;
+  } catch (error) {
+    console.error("Error generating or parsing template JSON from AI:", error);
+    return null;
+  }
+}
+
 
 const formatDurationForAI = (start: number, end: number): string => {
   const durationMs = end - start;
