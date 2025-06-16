@@ -165,7 +165,11 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ initialLanguage,
 
 
 // --- Dashboard Page ---
-export const DashboardPage: React.FC = () => {
+interface DashboardPageProps {
+  pomodoro: ReturnType<typeof usePomodoro>;
+  breakInvitationMessage: string | null;
+}
+export const DashboardPage: React.FC<DashboardPageProps> = ({ pomodoro, breakInvitationMessage }) => {
   const { t } = useLanguageContext();
   const today = getTodayDateString();
   const [dailyTask, setDailyTask] = useLocalStorage<DailyTask | null>(`${STORAGE_KEYS.DAILY_TASK}_${today}`, null);
@@ -179,33 +183,7 @@ export const DashboardPage: React.FC = () => {
   const [showMoodModal, setShowMoodModal] = useState(false);
   const [currentMood, setCurrentMood] = useState(3);
   const [currentEnergy, setCurrentEnergy] = useState(3);
-  const [breakInvitationMessage, setBreakInvitationMessage] = useState<string | null>(null);
   
-  const pomodoro = usePomodoro((endedMode, newMode, completedPomodoros) => {
-    // Log the completed session
-    const duration = endedMode === PomodoroMode.Work ? pomodoro.settings.workDuration 
-                   : endedMode === PomodoroMode.ShortBreak ? pomodoro.settings.shortBreakDuration 
-                   : pomodoro.settings.longBreakDuration;
-    const newLog: TimeLog = {
-      id: Date.now().toString(),
-      startTime: Date.now() - (duration * 60000),
-      endTime: Date.now(),
-      activity: endedMode === PomodoroMode.Work 
-                  ? `${t('timeTrackerActivityTypeFocus')} #${completedPomodoros}` 
-                  : `${t(endedMode === PomodoroMode.ShortBreak ? 'pomodoroModeShortBreak' : 'pomodoroModeLongBreak')}`,
-      type: endedMode === PomodoroMode.Work ? 'focus' : 'break',
-      date: getTodayDateString(),
-    };
-    saveData<TimeLog[]>(STORAGE_KEYS.TIME_LOGS, [...loadData<TimeLog[]>(STORAGE_KEYS.TIME_LOGS, []), newLog]);
-
-    // Show break invitation if a work session just ended
-    if (endedMode === PomodoroMode.Work) {
-        const breakTypeTranslationKey = newMode === PomodoroMode.ShortBreak ? 'pomodoroModeShortBreak' : 'pomodoroModeLongBreak';
-        setBreakInvitationMessage(t('dashboardBreakInvitation', { breakType: t(breakTypeTranslationKey) }));
-        setTimeout(() => setBreakInvitationMessage(null), 7000); // Auto-hide after 7 seconds
-    }
-  });
-
   useEffect(() => {
     const fetchAndSetQuote = async () => {
       setIsLoadingQuote(true);

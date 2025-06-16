@@ -1,15 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { useTheme, useLocalStorage } from './hooks';
+import { useTheme, useLocalStorage, usePomodoro } from './hooks'; // Added usePomodoro
 import { Sidebar, MobileHeader, FloatingActionButtons, HelpModal, AiChatModal, AiFeatureSelectionModal } from './uiElements';
 import { DashboardPage, CalendarPage, NotebookPage, TimeTrackerPage, ReviewPage, PlansPage, DisciplineBoardPage, ImportExportPage, OnboardingPage } from './Pages';
 import { STORAGE_KEYS, APP_NAME_TRANSLATION_KEY } from './constants';
-import { ChatMessage, Language, AiFeatureMode, FocusForgeTemplateData, Habit, WeeklyMission, WeeklyPlan, ScheduledGoal } from './types';
+import { ChatMessage, Language, AiFeatureMode, FocusForgeTemplateData, Habit, WeeklyMission, WeeklyPlan, ScheduledGoal, TimeLog, PomodoroMode } from './types'; // Added TimeLog, PomodoroMode
 import { getAiChatResponse, generateTemplateDataFromConversation, loadData, saveData } from './services';
 import { LanguageProvider, useLanguageContext } from './contexts'; 
 import { format, addDays } from 'date-fns';
 import startOfWeek from 'date-fns/startOfWeek';
+
+const getTodayDateString = () => format(new Date(), 'yyyy-MM-dd');
 
 const MainApp: React.FC = () => {
   const [theme, toggleTheme] = useTheme();
@@ -33,6 +35,37 @@ const MainApp: React.FC = () => {
 
   const chatMessages = currentAiMode === AiFeatureMode.Coach ? coachChatMessages : templateCreatorChatMessages;
   const setChatMessages = currentAiMode === AiFeatureMode.Coach ? setCoachChatMessages : setTemplateCreatorChatMessages;
+
+  // Pomodoro State Lifted
+  const [breakInvitationMessage, setBreakInvitationMessage] = useState<string | null>(null);
+  const pomodoro = usePomodoro((endedMode, newMode, completedPomodoros) => {
+    const currentSettings = pomodoro.settings;
+    const durationMinutes = 
+        endedMode === PomodoroMode.Work ? currentSettings.workDuration :
+        endedMode === PomodoroMode.ShortBreak ? currentSettings.shortBreakDuration :
+        currentSettings.longBreakDuration;
+
+    const newLog: TimeLog = {
+      id: Date.now().toString(),
+      startTime: Date.now() - (durationMinutes * 60000),
+      endTime: Date.now(),
+      activity: endedMode === PomodoroMode.Work 
+                  ? `${t('timeTrackerActivityTypeFocus')} #${completedPomodoros}` 
+                  : `${t(endedMode === PomodoroMode.ShortBreak ? 'pomodoroModeShortBreak' : 'pomodoroModeLongBreak')}`,
+      type: endedMode === PomodoroMode.Work ? 'focus' : 'break',
+      date: getTodayDateString(),
+    };
+    
+    const existingTimeLogs = loadData<TimeLog[]>(STORAGE_KEYS.TIME_LOGS, []);
+    saveData<TimeLog[]>(STORAGE_KEYS.TIME_LOGS, [...existingTimeLogs, newLog]);
+
+    if (endedMode === PomodoroMode.Work) {
+        const breakTypeTranslationKey = newMode === PomodoroMode.ShortBreak ? 'pomodoroModeShortBreak' : 'pomodoroModeLongBreak';
+        setBreakInvitationMessage(t('dashboardBreakInvitation', { breakType: t(breakTypeTranslationKey) }));
+        setTimeout(() => setBreakInvitationMessage(null), 7000);
+    }
+  });
+
 
   const getSystemInstruction = (mode: AiFeatureMode): string => {
     if (mode === AiFeatureMode.TemplateCreator) {
@@ -241,7 +274,7 @@ const MainApp: React.FC = () => {
         />
         <main className="flex-1 overflow-y-auto"> 
           <Routes>
-            <Route path="/" element={<DashboardPage />} />
+            <Route path="/" element={<DashboardPage pomodoro={pomodoro} breakInvitationMessage={breakInvitationMessage} />} />
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/notebook" element={<NotebookPage />} />
             <Route path="/timetracker" element={<TimeTrackerPage />} />

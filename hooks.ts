@@ -75,6 +75,7 @@ export const usePomodoro = (onTimerEnd?: (endedMode: PomodoroMode, newMode: Pomo
 
   const focusMusicAudioRef = useRef<HTMLAudioElement | null>(null);
   const timerEndSoundAudioRef = useRef<HTMLAudioElement | null>(null);
+  const lastHiddenTimestampRef = useRef<number | null>(null);
 
   useEffect(() => {
     focusMusicAudioRef.current = new Audio();
@@ -98,9 +99,8 @@ export const usePomodoro = (onTimerEnd?: (endedMode: PomodoroMode, newMode: Pomo
     }
   }, [isFocusMusicMuted]);
 
-  // This effect sets the timeLeft when mode or settings change, but NOT just when pausing.
   useEffect(() => {
-    if (!isRunning) { // Only reset time if timer is not running (i.e. mode changed, or settings changed while paused/stopped)
+    if (!isRunning) { 
         if (mode === PomodoroMode.Work) {
             setTimeLeft(settings.workDuration * 60);
         } else if (mode === PomodoroMode.ShortBreak) {
@@ -109,16 +109,16 @@ export const usePomodoro = (onTimerEnd?: (endedMode: PomodoroMode, newMode: Pomo
             setTimeLeft(settings.longBreakDuration * 60);
         }
     }
-  }, [settings, mode]); 
+  }, [settings, mode]); // Removed isRunning from dependency array to prevent reset on pause/resume. Time reset only happens on mode/settings change IF NOT RUNNING.
 
   useEffect(() => {
     let timerId: number | undefined;
 
     if (isRunning && timeLeft > 0) {
       timerId = window.setInterval(() => {
-        setTimeLeft((prevTime) => prevTime - 1);
+        setTimeLeft((prevTime) => Math.max(0, prevTime - 1)); // Ensure timeLeft doesn't go below 0 during interval
       }, 1000);
-    } else if (isRunning && timeLeft === 0) {
+    } else if (isRunning && timeLeft <= 0) { // Changed to <= 0 for robustness
       setIsRunning(false);
       const endedMode = mode;
 
@@ -156,6 +156,29 @@ export const usePomodoro = (onTimerEnd?: (endedMode: PomodoroMode, newMode: Pomo
     return () => window.clearInterval(timerId);
   }, [isRunning, timeLeft, mode, pomodorosCompleted, settings, onTimerEnd]);
 
+  // Effect to handle page visibility changes for timer accuracy
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!isRunning) return;
+
+      if (document.hidden) {
+        lastHiddenTimestampRef.current = Date.now();
+      } else {
+        if (lastHiddenTimestampRef.current) {
+          const elapsedMilliseconds = Date.now() - lastHiddenTimestampRef.current;
+          const elapsedSeconds = Math.round(elapsedMilliseconds / 1000);
+          setTimeLeft(prevTimeLeft => Math.max(0, prevTimeLeft - elapsedSeconds));
+          lastHiddenTimestampRef.current = null;
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isRunning]); // Only depends on isRunning
+
   const handleFocusMusicUpload = useCallback((file: File | null) => {
     if (customFocusMusicObjectURL) {
       URL.revokeObjectURL(customFocusMusicObjectURL);
@@ -181,13 +204,17 @@ export const usePomodoro = (onTimerEnd?: (endedMode: PomodoroMode, newMode: Pomo
 
   const startTimer = useCallback(() => {
     setIsRunning(true);
+    // If timer was paused and timeLeft is 0 due to background adjustment, trigger end logic immediately
+    if (timeLeft <= 0) {
+         setTimeLeft(0); // Ensure timeLeft is exactly 0 to trigger end logic in the main timer useEffect
+    }
     if (mode === PomodoroMode.Work && customFocusMusicObjectURL && focusMusicAudioRef.current) {
         if (focusMusicAudioRef.current.src !== customFocusMusicObjectURL) { 
              focusMusicAudioRef.current.src = customFocusMusicObjectURL;
         }
         focusMusicAudioRef.current.play().catch(e => console.warn("Custom focus music play failed:", e));
     }
-  }, [mode, customFocusMusicObjectURL]);
+  }, [mode, customFocusMusicObjectURL, timeLeft]); // Added timeLeft
 
   const pauseTimer = useCallback(() => {
     setIsRunning(false);
@@ -203,8 +230,8 @@ export const usePomodoro = (onTimerEnd?: (endedMode: PomodoroMode, newMode: Pomo
         focusMusicAudioRef.current.currentTime = 0;
     }
     setMode(PomodoroMode.Work);
-    setTimeLeft(settings.workDuration * 60); // Explicitly set timeLeft for Work mode
-    setPomodorosCompleted(0); // Reset completed pomodoros count
+    setTimeLeft(settings.workDuration * 60); 
+    setPomodorosCompleted(0); 
   }, [settings.workDuration]);
 
   const skipBreak = useCallback(() => {
@@ -222,6 +249,7 @@ export const usePomodoro = (onTimerEnd?: (endedMode: PomodoroMode, newMode: Pomo
              focusMusicAudioRef.current.currentTime = 0;
         }
     }
+    // Time will be reset by the useEffect that depends on [settings, mode]
     setMode(newMode); 
   }, []); 
 
