@@ -22,6 +22,8 @@ export const translations: Record<Language, Record<string, string>> = {
     exportError: "Error exporting template.",
     starterTemplateApplySuccess: "'{templateName}' template applied successfully! Your data has been updated.",
     starterTemplateApplyCancelled: "Starter template application cancelled.",
+    applyButton: "Apply",
+    cancelButton: "Cancel",
 
 
     // Onboarding
@@ -238,6 +240,13 @@ export const translations: Record<Language, Record<string, string>> = {
     pomodoroMuteFocusMusic: "Mute focus music",
     pomodoroUnmuteFocusMusic: "Unmute focus music",
     pomodoroFocusMusicNote: "Music is for current session only, not saved on page reload.",
+    pomodoroCustomizeDurationsTitle: "Customize Durations (minutes)",
+    pomodoroWorkDurationLabel: "Work:",
+    pomodoroShortBreakDurationLabel: "Short Break:",
+    pomodoroLongBreakDurationLabel: "Long Break:",
+    pomodoroCustomizeDurationsNote: "Changes apply when timer is not running or on next cycle/reset.",
+    pomodoroDurationButton: "Duration",
+
 
     // EditableField
     editableFieldDefaultPlaceholder: "Click to edit",
@@ -418,6 +427,8 @@ Follow this sequence:
     exportError: "አብነት በማውጣት ላይ ስህተት ተፈጥሯል።",
     starterTemplateApplySuccess: "'{templateName}' አብነት በተሳካ ሁኔታ ተተግብሯል! የእርስዎ መረጃ ተዘምኗል።",
     starterTemplateApplyCancelled: "የጀማሪ አብነት ትግበራ ተሰርዟል።",
+    applyButton: "ተግብር",
+    cancelButton: "ሰርዝ",
 
 
     // Onboarding
@@ -629,6 +640,13 @@ Follow this sequence:
     pomodoroMuteFocusMusic: "የትኩረት ሙዚቃ ድምጸ ከል አድርግ",
     pomodoroUnmuteFocusMusic: "የትኩረት ሙዚቃ ድምጽ ክፈት",
     pomodoroFocusMusicNote: "ሙዚቃው ለአሁኑ ክፍለ ጊዜ ብቻ ነው፣ ገጹ እንደገና ሲጫን አይቀመጥም።",
+    pomodoroCustomizeDurationsTitle: "የጊዜ ቆይታዎችን አስተካክል (ደቂቃዎች)",
+    pomodoroWorkDurationLabel: "ሥራ:",
+    pomodoroShortBreakDurationLabel: "አጭር እረፍት:",
+    pomodoroLongBreakDurationLabel: "ረጅም እረፍት:",
+    pomodoroCustomizeDurationsNote: "ለውጦች ሰዓት ቆጣሪው በማይሰራበት ጊዜ ወይም በሚቀጥለው ዑደት/ዳግም ማስጀመር ላይ ተግባራዊ ይሆናሉ።",
+    pomodoroDurationButton: "የቆይታ ጊዜ",
+
 
     // EditableField
     editableFieldDefaultPlaceholder: "ለማስተካከል ጠቅ ያድርጉ",

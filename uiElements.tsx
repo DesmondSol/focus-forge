@@ -255,6 +255,8 @@ export const PomodoroControls: React.FC<PomodoroControlsProps> = ({ pomodoro, br
     timeLeft, 
     isRunning, 
     mode, 
+    settings,
+    setSettings,
     startTimer, 
     pauseTimer, 
     resetTimer, 
@@ -268,6 +270,17 @@ export const PomodoroControls: React.FC<PomodoroControlsProps> = ({ pomodoro, br
   const { t } = useLanguageContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [isDurationModalOpen, setIsDurationModalOpen] = useState(false);
+  const [modalSettings, setModalSettings] = useState<PomodoroSettings>(settings);
+
+  useEffect(() => {
+    // Keep modalSettings in sync if the main settings change while modal is not open
+    if (!isDurationModalOpen) {
+      setModalSettings(settings);
+    }
+  }, [settings, isDurationModalOpen]);
+
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -276,9 +289,9 @@ export const PomodoroControls: React.FC<PomodoroControlsProps> = ({ pomodoro, br
 
   const progressPercentage = () => {
     let totalDuration;
-    if (mode === PomodoroMode.Work) totalDuration = pomodoro.settings.workDuration * 60;
-    else if (mode === PomodoroMode.ShortBreak) totalDuration = pomodoro.settings.shortBreakDuration * 60;
-    else totalDuration = pomodoro.settings.longBreakDuration * 60;
+    if (mode === PomodoroMode.Work) totalDuration = settings.workDuration * 60;
+    else if (mode === PomodoroMode.ShortBreak) totalDuration = settings.shortBreakDuration * 60;
+    else totalDuration = settings.longBreakDuration * 60;
     if (totalDuration === 0) return 0;
     return ((totalDuration - timeLeft) / totalDuration) * 100;
   };
@@ -298,6 +311,24 @@ export const PomodoroControls: React.FC<PomodoroControlsProps> = ({ pomodoro, br
       handleFocusMusicUpload(file);
     }
   };
+
+  const handleModalSettingChange = (field: keyof PomodoroSettings, value: string) => {
+    const numValue = parseInt(value, 10);
+    if (!isNaN(numValue) && numValue > 0) {
+        setModalSettings(prev => ({...prev, [field]: numValue }));
+    }
+  };
+
+  const handleApplyDurationSettings = () => {
+    setSettings(modalSettings);
+    setIsDurationModalOpen(false);
+  };
+  
+  const openDurationModal = () => {
+    setModalSettings(settings); // Ensure modal opens with current settings
+    setIsDurationModalOpen(true);
+  };
+
 
   return (
     <div className="p-4 sm:p-6 rounded-lg shadow-lg bg-bglight-surface dark:bg-bgdark-surface text-center w-full max-w-md mx-auto">
@@ -342,6 +373,7 @@ export const PomodoroControls: React.FC<PomodoroControlsProps> = ({ pomodoro, br
           <Button onClick={pauseTimer} size="md" variant="secondary" leftIcon={<Icons.Pause className="w-5 h-5 sm:w-6 sm:h-6" />} translationKey="pomodoroButtonPause"/>
         )}
         <Button onClick={resetTimer} size="md" variant="ghost" leftIcon={<Icons.Stop className="w-5 h-5 sm:w-6 sm:h-6" />} translationKey="pomodoroButtonReset"/>
+        <Button onClick={openDurationModal} size="md" variant="ghost" translationKey="pomodoroDurationButton" />
         {mode === PomodoroMode.Work && customFocusMusicFileName && isRunning && (
             <Button 
                 onClick={toggleFocusMusicMute} 
@@ -401,6 +433,62 @@ export const PomodoroControls: React.FC<PomodoroControlsProps> = ({ pomodoro, br
       {breakInvitationMessage && (
         <p className="mt-2 text-sm text-accent dark:text-accent font-semibold animate-pulse">{breakInvitationMessage}</p>
       )}
+
+      <Modal
+        isOpen={isDurationModalOpen}
+        onClose={() => setIsDurationModalOpen(false)}
+        title={t('pomodoroCustomizeDurationsTitle')}
+        size="md"
+        footerContent={
+          <div className="flex justify-end space-x-2">
+            <Button onClick={() => setIsDurationModalOpen(false)} variant="secondary" translationKey="cancelButton" />
+            <Button onClick={handleApplyDurationSettings} translationKey="applyButton" />
+          </div>
+        }
+      >
+        <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 items-center">
+                <div>
+                    <label htmlFor="modalWorkDuration" className="block text-xs text-textlight-muted dark:text-textdark-muted mb-0.5">{t('pomodoroWorkDurationLabel')}</label>
+                    <input
+                        type="number"
+                        id="modalWorkDuration"
+                        value={modalSettings.workDuration}
+                        onChange={(e) => handleModalSettingChange('workDuration', e.target.value)}
+                        min="1"
+                        className="w-full p-1.5 border border-gray-300 dark:border-gray-600 rounded-md bg-bglight-surface dark:bg-bgdark text-textlight dark:text-textdark focus:ring-1 focus:ring-primary focus:border-primary text-sm"
+                        aria-label={t('pomodoroWorkDurationLabel')}
+                    />
+                </div>
+                <div>
+                    <label htmlFor="modalShortBreakDuration" className="block text-xs text-textlight-muted dark:text-textdark-muted mb-0.5">{t('pomodoroShortBreakDurationLabel')}</label>
+                    <input
+                        type="number"
+                        id="modalShortBreakDuration"
+                        value={modalSettings.shortBreakDuration}
+                        onChange={(e) => handleModalSettingChange('shortBreakDuration', e.target.value)}
+                        min="1"
+                        className="w-full p-1.5 border border-gray-300 dark:border-gray-600 rounded-md bg-bglight-surface dark:bg-bgdark text-textlight dark:text-textdark focus:ring-1 focus:ring-primary focus:border-primary text-sm"
+                        aria-label={t('pomodoroShortBreakDurationLabel')}
+                    />
+                </div>
+                <div>
+                    <label htmlFor="modalLongBreakDuration" className="block text-xs text-textlight-muted dark:text-textdark-muted mb-0.5">{t('pomodoroLongBreakDurationLabel')}</label>
+                    <input
+                        type="number"
+                        id="modalLongBreakDuration"
+                        value={modalSettings.longBreakDuration}
+                        onChange={(e) => handleModalSettingChange('longBreakDuration', e.target.value)}
+                        min="1"
+                        className="w-full p-1.5 border border-gray-300 dark:border-gray-600 rounded-md bg-bglight-surface dark:bg-bgdark text-textlight dark:text-textdark focus:ring-1 focus:ring-primary focus:border-primary text-sm"
+                        aria-label={t('pomodoroLongBreakDurationLabel')}
+                    />
+                </div>
+            </div>
+            <p className="text-xs text-textlight-muted dark:text-textdark-muted italic">{t('pomodoroCustomizeDurationsNote')}</p>
+        </div>
+      </Modal>
+
     </div>
   );
 };
