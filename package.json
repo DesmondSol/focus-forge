@@ -9,12 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "^1.5.1",
-    "@vercel/analytics": "^1.5.0",
-    "date-fns": "^4.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-router-dom": "^7.6.2"
+    "@google/genai": "^1.5.1",
+    "react-router-dom": "^7.6.2",
+    "date-fns": "^4.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
